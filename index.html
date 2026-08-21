@@ -1,0 +1,943 @@
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  #appraisal-root {
+    --ink: #0b1f3a;
+    --paper: #f4f7fc;
+    --panel: #ffffff;
+    --line: #dde5f2;
+    --muted: #5f7086;
+    --accent: #0e4c92;
+    --accent-dark: #0a2f63;
+    --accent-2: #ff7a1a;
+    --accent-2-dark: #e8650a;
+    --good: #10925d;
+    --good-bg: #e1f7ec;
+    --outstanding: #7c3aed;
+    --outstanding-bg: #efe7fd;
+    --needs: #d97706;
+    --needs-bg: #fef3d8;
+    --risk: #dc2626;
+    --risk-bg: #fde3e3;
+    --display: 'Poppins', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --body: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --mono: 'IBM Plex Mono', 'Consolas', 'Courier New', monospace;
+
+    font-family: var(--body);
+    color: var(--ink);
+    background: var(--paper);
+    max-width: 100%;
+    min-height: 100vh;
+    box-sizing: border-box;
+    padding: 28px 32px 60px;
+  }
+  #appraisal-root * { box-sizing: border-box; }
+  #appraisal-root a { color: inherit; }
+
+  .ar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(120deg, var(--accent-dark) 0%, var(--accent) 65%, #1c74c9 100%);
+    color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 6px 0 -2px var(--accent-2), 0 10px 24px rgba(10,47,99,0.18);
+    padding: 22px 26px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .ar-eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.72);
+    margin: 0 0 6px;
+  }
+  .ar-title {
+    font-family: var(--display);
+    font-size: 30px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.01em;
+    color: #ffffff;
+  }
+  .ar-baseline {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: rgba(255,255,255,0.85);
+    text-align: right;
+    line-height: 1.6;
+  }
+
+  .ar-tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ar-tab {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: none;
+    border: none;
+    padding: 10px 16px;
+    cursor: pointer;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    white-space: nowrap;
+  }
+  .ar-tab.active {
+    color: var(--accent);
+    border-bottom: 2px solid var(--accent-2);
+    font-weight: 600;
+  }
+
+  .ar-panel { display: none; }
+  .ar-panel.active { display: block; }
+
+  .ar-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .ar-stats {
+    display: flex;
+    gap: 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    flex-wrap: wrap;
+  }
+  .ar-stats span {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 6px 12px;
+  }
+  .ar-stats b { color: var(--accent); font-size: 14px; }
+
+  button.ar-btn {
+    font-family: var(--body);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 9px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--accent-2);
+    background: linear-gradient(135deg, var(--accent-2) 0%, var(--accent-2-dark) 100%);
+    color: #ffffff;
+    cursor: pointer;
+    transition: opacity 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+  }
+  button.ar-btn.secondary {
+    background: #ffffff;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+  button.ar-btn.small {
+    padding: 6px 11px;
+    font-size: 12px;
+  }
+  button.ar-btn:hover { opacity: 0.9; box-shadow: 0 3px 10px rgba(255,122,26,0.28); transform: translateY(-1px); }
+  button.ar-btn.secondary:hover { box-shadow: 0 3px 10px rgba(14,76,146,0.2); }
+  button.ar-btn.danger {
+    background: #ffffff;
+    color: var(--risk);
+    border: 1px solid var(--risk);
+  }
+  button.ar-btn.danger:hover { background: var(--risk-bg); }
+
+  .ar-table-scroll {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    box-shadow: 0 2px 10px rgba(11,31,58,0.05);
+  }
+  table.ar-table {
+    width: 100%;
+    min-width: 640px;
+    border-collapse: collapse;
+    background: var(--panel);
+  }
+  table.ar-table th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-align: left;
+    color: #ffffff;
+    padding: 11px 12px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(120deg, var(--accent-dark), var(--accent));
+    white-space: nowrap;
+  }
+  table.ar-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+    font-size: 13.5px;
+    vertical-align: middle;
+  }
+  table.ar-table tr:last-child td { border-bottom: none; }
+  table.ar-table tr:hover td { background: #f0f5fc; }
+
+  .ar-name { font-weight: 600; }
+  .ar-id { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  .ar-incident-id {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--accent);
+    background: #eaf2fc;
+    padding: 3px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  .ar-pill {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-weight: 600;
+  }
+  .ar-pill.OUTSTANDING { background: var(--outstanding-bg); color: var(--outstanding); }
+  .ar-pill.GOOD { background: var(--good-bg); color: var(--good); }
+  .ar-pill.NEEDS-IMPROVEMENT { background: var(--needs-bg); color: var(--needs); }
+  .ar-pill.AT-RISK { background: var(--risk-bg); color: var(--risk); }
+
+  .ar-bar-track {
+    width: 90px;
+    height: 6px;
+    background: #eae7de;
+    border-radius: 3px;
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  .ar-bar-fill { height: 100%; border-radius: 3px; }
+
+  .ar-rating-cell { display: flex; align-items: center; }
+  .ar-rating-num { font-family: var(--mono); font-weight: 600; font-size: 13px; }
+
+  .ar-delta-pos { color: var(--good); font-family: var(--mono); }
+  .ar-delta-neg { color: var(--risk); font-family: var(--mono); }
+  .ar-delta-zero { color: var(--muted); font-family: var(--mono); }
+
+  .ar-form-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(28,35,33,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+  }
+  .ar-form-card {
+    background: var(--panel);
+    border-radius: 6px;
+    padding: 26px 28px;
+    width: 480px;
+    max-width: 92vw;
+    max-height: 86vh;
+    overflow-y: auto;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+  }
+  .ar-form-card h3 {
+    font-family: var(--display);
+    margin: 0 0 4px;
+    font-size: 20px;
+  }
+  .ar-form-sub { font-size: 12px; color: var(--muted); margin: 0 0 18px; }
+  .ar-field { margin-bottom: 14px; }
+  .ar-field label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin-bottom: 5px;
+  }
+  .ar-field input[type=text],
+  .ar-field input[type=date],
+  .ar-field input[type=number],
+  .ar-field select,
+  .ar-field textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    font-family: var(--body);
+    font-size: 13.5px;
+    background: var(--paper);
+  }
+  .ar-field textarea { resize: vertical; min-height: 56px; }
+  .ar-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .ar-impact-group {
+    display: flex;
+    gap: 16px;
+    padding: 10px 12px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+  }
+  .ar-impact-group label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--body);
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 13px;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .ar-effect-toggle { display: flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .ar-effect-toggle button {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    background: var(--paper);
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--muted);
+  }
+  .ar-effect-toggle button.on.NEGATIVE { background: var(--risk); color: white; }
+  .ar-effect-toggle button.on.POSITIVE { background: var(--good); color: white; }
+  .ar-live-calc {
+    margin-top: 4px;
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 10px 12px;
+    background: var(--paper);
+    border: 1px dashed var(--line);
+    border-radius: 4px;
+    color: var(--muted);
+  }
+  .ar-form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+
+  .ar-rules-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+  .ar-rule-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--accent-2);
+    border-radius: 8px;
+    padding: 14px 16px;
+    box-shadow: 0 2px 8px rgba(11,31,58,0.05);
+  }
+  .ar-rule-card h4 { margin: 0 0 4px; font-family: var(--display); font-size: 16px; color: var(--accent-dark); }
+  .ar-rule-card .rate { font-family: var(--mono); font-size: 13px; color: var(--accent-2-dark); margin: 0 0 8px; font-weight: 600; }
+  .ar-rule-card p { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+
+  .ar-band-list { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .ar-band {
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .ar-empty { padding: 40px; text-align: center; color: var(--muted); font-size: 13px; }
+  .ar-loading { padding: 60px; text-align: center; color: var(--muted); font-family: var(--mono); font-size: 13px; }
+  .ar-desc-cell { max-width: 280px; white-space: normal; font-size: 12.5px; color: #3a4457; }
+  .ar-footnote { margin-top: 22px; font-size: 11.5px; color: var(--muted); font-family: var(--mono); }
+  .ar-field-error {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--risk);
+    margin-top: 4px;
+    display: none;
+  }
+  .ar-field-error.show { display: block; }
+  .ar-field input.ar-invalid { border-color: var(--risk); }
+
+  /* ---- Mobile-friendly layout ---- */
+  @media (max-width: 768px) {
+    #appraisal-root { padding: 16px 14px 40px; }
+    .ar-header {
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 18px 18px;
+    }
+    .ar-baseline { text-align: left; }
+    .ar-title { font-size: 24px; }
+    .ar-toolbar { flex-direction: column; align-items: stretch; }
+    .ar-toolbar > div { justify-content: flex-start; }
+    .ar-stats { justify-content: space-between; }
+    button.ar-btn.small { flex: 1; }
+    .ar-rules-grid { grid-template-columns: 1fr; }
+    .ar-band-list { grid-template-columns: 1fr 1fr; }
+    .ar-form-card { width: 100%; padding: 20px; }
+    .ar-row2 { grid-template-columns: 1fr; }
+    .ar-impact-group { flex-direction: column; gap: 8px; }
+  }
+  @media (max-width: 480px) {
+    .ar-band-list { grid-template-columns: 1fr; }
+    .ar-title { font-size: 20px; }
+    .ar-eyebrow { font-size: 20px; }
+    table.ar-table { min-width: 560px; }
+  }
+</style>
+
+<div id="appraisal-root">
+  <div class="ar-loading" id="ar-loading">Loading appraisal data…</div>
+  <div id="ar-app" style="display:none;">
+    <div class="ar-header">
+      <div>
+        <p class="ar-eyebrow">Improve Business Solutions · Employee Appraisal</p>
+        <h1 class="ar-title">Appraisal Tracker</h1>
+      </div>
+      <div class="ar-baseline">
+        Base rating 8.00%<br>
+        Minimum acceptable 5.00%
+      </div>
+    </div>
+
+    <div class="ar-tabs">
+      <button class="ar-tab active" data-tab="summary">Summary</button>
+      <button class="ar-tab" data-tab="log">Incident Log</button>
+      <button class="ar-tab" data-tab="rules">Rules &amp; Reference</button>
+    </div>
+
+    <div class="ar-panel active" id="panel-summary">
+      <div class="ar-toolbar">
+        <div class="ar-stats" id="ar-summary-stats"></div>
+        <div style="display:flex; gap:8px;">
+          <button class="ar-btn small secondary" id="btn-export-summary">Export CSV</button>
+          <button class="ar-btn small secondary" id="btn-add-employee">+ Add employee</button>
+        </div>
+      </div>
+      <div class="ar-table-scroll">
+      <table class="ar-table">
+        <thead>
+          <tr>
+            <th>Employee</th>
+            <th>ID</th>
+            <th>Reporting Manager</th>
+            <th>Deduction / addition</th>
+            <th>Final rating</th>
+            <th># Incidents</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="ar-summary-body"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="ar-panel" id="panel-log">
+      <div class="ar-toolbar">
+        <div class="ar-stats" id="ar-log-stats"></div>
+        <div style="display:flex; gap:8px;">
+          <button class="ar-btn small secondary" id="btn-export-log">Export CSV</button>
+          <button class="ar-btn small" id="btn-add-incident">+ Log incident</button>
+        </div>
+      </div>
+      <div class="ar-table-scroll">
+      <table class="ar-table">
+        <thead>
+          <tr>
+            <th>Incident ID</th>
+            <th>Date</th>
+            <th>Employee</th>
+            <th>Description</th>
+            <th>Effect</th>
+            <th>Impact</th>
+            <th>Result</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="ar-log-body"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="ar-panel" id="panel-rules">
+      <div class="ar-rules-grid">
+        <div class="ar-rule-card">
+          <h4>Business level</h4>
+          <p class="rate">± 1.00% per instance</p>
+          <p>Mistakes that put revenue, clients, the brand, or company targets at risk. Impact is felt outside the immediate team. Escalate to manager.</p>
+        </div>
+        <div class="ar-rule-card">
+          <h4>Process level</h4>
+          <p class="rate">± 0.50% per instance</p>
+          <p>Non-compliance with SOPs, policies, or guidelines. Training may be required.</p>
+        </div>
+        <div class="ar-rule-card">
+          <h4>Team level</h4>
+          <p class="rate">± 0.25% per instance</p>
+          <p>Friction, coverage gaps, or conduct that affects the immediate team without external exposure.</p>
+        </div>
+      </div>
+      <p class="ar-form-sub" style="margin-bottom:10px;">If an employee's instance count for a NEGATIVE incident reaches 2 or more, that incident's deduction rates double. Positive incidents always use the base rates. Rates are additive across the impact levels selected for a single incident.</p>
+      <div class="ar-band-list">
+        <div class="ar-band" style="background:var(--outstanding-bg); color:var(--outstanding);">Above 8% → OUTSTANDING</div>
+        <div class="ar-band" style="background:var(--good-bg); color:var(--good);">6%–8% → GOOD</div>
+        <div class="ar-band" style="background:var(--needs-bg); color:var(--needs);">5%–6% → NEEDS IMPROVEMENT</div>
+        <div class="ar-band" style="background:var(--risk-bg); color:var(--risk);">Below 5% → AT RISK, requires HR + manager intervention</div>
+      </div>
+      <p class="ar-footnote">Note: bands are evaluated in order above — a rating below 5% is AT RISK even though it is also below 6%.</p>
+    </div>
+
+    <div class="ar-footnote" id="ar-sync-note">Shared with everyone who opens this tool — incidents logged here are visible to other users.</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const RATES = { business: 0.01, process: 0.005, team: 0.0025 };
+  const BASE_RATING = 0.08;
+  const DATA_VERSION = "2026-08-22-roster-reset";
+
+  const SEED_EMPLOYEES = [
+    // -- Lazar's team (previously loaded) --
+    ["Dheeraj Kumar Jamalpur", "IBS-305", "Lazar"], ["Pavan Kumar B.V.S", "IBS-424", "Lazar"],
+    ["Suresh Babu Kusuma", "IBS-432", "Lazar"], ["Bindu Sagar Kusuma", "IBS-449", "Lazar"],
+    ["Mounika Vikrayala", "IBS-455", "Lazar"], ["Padma Korra", "IBS-474", "Lazar"],
+    ["Pardha Saradhi Appikatla", "IBS-481", "Lazar"], ["Shiva Ram Jogu", "IBS-491", "Lazar"],
+    ["Lokesh Varma Gunturi", "IBS-502", "Lazar"], ["Sampath Kumar Chevuri", "IBS-514", "Lazar"],
+    ["Ankit Pati", "IBS-537", "Lazar"], ["Revanth Kumar Yarrabothini", "IBS-543", "Lazar"],
+    ["Azhar Mohammed", "IBS-544", "Lazar"], ["Nandini Bokkisam", "IBS-548", "Lazar"],
+    ["Praveen Bhukya", "IBS-568", "Lazar"], ["Vamshi Koduru", "IBS-593", "Lazar"],
+    ["Ananda Rao Garnepudi", "IBS-602", "Lazar"], ["Anvesh Dharmarapu", "IBS-606", "Lazar"],
+    ["Mahesh M", "IBS-608", "Lazar"], ["Azgar Ali Syed", "IBS-613", "Lazar"],
+    ["Upender Ummaneni", "IBS-620", "Lazar"], ["Pavan Cheemikala", "IBS-627", "Lazar"],
+    ["Ashok Kumar Bandi", "IBS-632", "Lazar"], ["Akhilesh Goud Kancharla", "IBS-633", "Lazar"],
+    ["Satya Hemalatha Gundumalla", "IBS-636", "Lazar"], ["Venu Basa", "IBS-640", "Lazar"],
+    ["Kotha Bhuvanesh Gupta", "IBS-641", "Lazar"], ["Sameer Shaik", "IBS-644", "Lazar"],
+    ["Vineela Barigela", "IBS-647", "Lazar"], ["Prashanth Paka", "IBS-650", "Lazar"],
+    ["Aman Abdul", "IBS-654", "Lazar"],
+    // -- Aakash's team --
+    ["Sharmila Sahu", "IBS-383", "Aakash"], ["Mahesh Bandi", "IBS-441", "Aakash"],
+    ["Tejaswi Rachakonda", "IBS-468", "Aakash"], ["Jaya Venkata Bai Nandlal", "IBS-477", "Aakash"],
+    ["Venkatesh Pendem", "IBS-530", "Aakash"], ["Rahul Rishi Dana", "IBS-563", "Aakash"],
+    ["Sravana Kumar Poosala", "IBS-585", "Aakash"], ["Naveen Gandhalam", "IBS-623", "Aakash"],
+    ["Manikanth Aatigada", "IBS-626", "Aakash"], ["Abhishek T", "IBS-634", "Aakash"],
+    ["Rakesh Pulgam", "IBS-638", "Aakash"], ["Rahul Reddy Kankanala", "IBS-653", "Aakash"],
+    ["Omkar Palavi", "CON-001", "Aakash"], ["Srikar Sanvally", "CON-002", "Aakash"],
+    ["Abhilasha Jagannadham", "CON-003", "Aakash"], ["Kalyani Palle", "CON-004", "Aakash"],
+    // -- Ahmed's team --
+    ["Jaya Prakash Vittamsetti", "IBS-396", "Ahmed"], ["Sravan Kumar Sanda", "IBS-401", "Ahmed"],
+    ["Shiva Sana", "IBS-501", "Ahmed"], ["Sai Kiran Ankari", "IBS-580", "Ahmed"],
+    ["Ansaruddin Mohd", "IBS-591", "Ahmed"], ["K Bhanuprakash Goud", "IBS-600", "Ahmed"],
+    ["Mehrajuddin", "IBS-601", "Ahmed"], ["Nushanth Goud Karingla", "IBS-603", "Ahmed"],
+    ["Venkata Pradeep Siva Ramaraju Patsamatla", "IBS-605", "Ahmed"], ["Sai Naga Venkata Komal Garlapati", "IBS-630", "Ahmed"],
+    ["Mahesh Anand Ulpi", "IBS-637", "Ahmed"], ["Charan Raparthi", "IBS-639", "Ahmed"],
+    ["Veerababu Chellapu", "CON-005", "Ahmed"]
+  ].map((e, i) => ({ id: "emp_" + (i + 1), name: e[0], empId: e[1], reportingManager: e[2] }));
+
+  const SEED_INCIDENTS = [];
+
+  let employees = [];
+  let incidents = [];
+
+  const API_BASE = "/api/appraisal-data";
+
+  async function apiGet(key) {
+    const res = await fetch(`${API_BASE}?key=${encodeURIComponent(key)}`);
+    if (!res.ok) throw new Error("GET " + key + " failed: " + res.status);
+    const data = await res.json();
+    return data.value;
+  }
+
+  async function apiSet(key, value) {
+    const res = await fetch(`${API_BASE}?key=${encodeURIComponent(key)}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ value })
+    });
+    if (!res.ok) throw new Error("POST " + key + " failed: " + res.status);
+  }
+
+  async function saveEmployees() {
+    try { await apiSet("employees", employees); }
+    catch (err) { console.error("save employees failed", err); alert("Could not save — check your connection and try again."); }
+  }
+  async function saveIncidents() {
+    try { await apiSet("incidents", incidents); }
+    catch (err) { console.error("save incidents failed", err); alert("Could not save — check your connection and try again."); }
+  }
+
+  async function loadData() {
+    let storedVersion = null;
+    try {
+      storedVersion = await apiGet("dataVersion");
+    } catch (err) { storedVersion = null; }
+
+    if (storedVersion !== DATA_VERSION) {
+      // Fresh roster + clean incident log for this version — overwrites whatever was there before.
+      employees = SEED_EMPLOYEES;
+      incidents = SEED_INCIDENTS;
+      try { await apiSet("dataVersion", DATA_VERSION); } catch (err) {}
+      await saveEmployees();
+      await saveIncidents();
+      return;
+    }
+
+    try {
+      const e = await apiGet("employees");
+      employees = (e && e.length) ? e : SEED_EMPLOYEES;
+    } catch (err) { employees = SEED_EMPLOYEES; }
+    try {
+      const i = await apiGet("incidents");
+      incidents = i || SEED_INCIDENTS;
+    } catch (err) { incidents = SEED_INCIDENTS; }
+    if (!employees.length) employees = SEED_EMPLOYEES;
+  }
+
+  function incidentResult(inc) {
+    const n = Number(inc.instanceCount) || 1;
+    const negative = inc.effect === "NEGATIVE";
+    const doubled = negative && n >= 2;
+    const mult = negative ? (doubled ? -2 : -1) : 1;
+    let total = 0;
+    if (inc.business) total += RATES.business * mult;
+    if (inc.process) total += RATES.process * mult;
+    if (inc.team) total += RATES.team * mult;
+    return total;
+  }
+
+  function employeeSummary(emp) {
+    const own = incidents.filter(i => i.employeeId === emp.id);
+    const deduction = own.reduce((sum, i) => sum + incidentResult(i), 0);
+    const final = BASE_RATING + deduction;
+    let status;
+    if (final > 0.08) status = "OUTSTANDING";
+    else if (final < 0.05) status = "AT RISK";
+    else if (final < 0.06) status = "NEEDS IMPROVEMENT";
+    else status = "GOOD";
+    return { deduction, final, count: own.length, status };
+  }
+
+  function pct(n) { return (n * 100).toFixed(2) + "%"; }
+  function pctSigned(n) {
+    const s = (n * 100).toFixed(2) + "%";
+    return n > 0 ? "+" + s : s;
+  }
+  function statusClass(s) { return s.replace(/ /g, "-"); }
+  function barColor(status) {
+    return { "OUTSTANDING": "var(--outstanding)", "GOOD": "var(--good)", "NEEDS IMPROVEMENT": "var(--needs)", "AT RISK": "var(--risk)" }[status];
+  }
+
+  function renderSummary() {
+    const body = document.getElementById("ar-summary-body");
+    if (!employees.length) {
+      body.innerHTML = '<tr><td colspan="8" class="ar-empty">No employees yet. Add one to get started.</td></tr>';
+    } else {
+      body.innerHTML = employees.map(emp => {
+        const s = employeeSummary(emp);
+        const deltaClass = s.deduction > 0 ? "ar-delta-pos" : (s.deduction < 0 ? "ar-delta-neg" : "ar-delta-zero");
+        const barPct = Math.max(0, Math.min(100, (s.final / 0.12) * 100));
+        return `<tr>
+          <td class="ar-name">${escapeHtml(emp.name)}</td>
+          <td class="ar-id">${escapeHtml(emp.empId)}</td>
+          <td class="ar-id">${escapeHtml(emp.reportingManager || "—")}</td>
+          <td class="${deltaClass}">${pctSigned(s.deduction)}</td>
+          <td>
+            <div class="ar-rating-cell">
+              <span class="ar-bar-track"><span class="ar-bar-fill" style="width:${barPct}%; background:${barColor(s.status)};"></span></span>
+              <span class="ar-rating-num">${pct(s.final)}</span>
+            </div>
+          </td>
+          <td>${s.count}</td>
+          <td><span class="ar-pill ${statusClass(s.status)}">${s.status}</span></td>
+          <td><button class="ar-btn small danger" data-delete-employee="${emp.id}">Delete</button></td>
+        </tr>`;
+      }).join("");
+    }
+    const atRisk = employees.filter(e => employeeSummary(e).status === "AT RISK").length;
+    document.getElementById("ar-summary-stats").innerHTML =
+      `<span><b>${employees.length}</b> employees</span><span><b>${incidents.length}</b> incidents</span><span><b>${atRisk}</b> at risk</span>`;
+  }
+
+  function renderLog() {
+    const body = document.getElementById("ar-log-body");
+    const sorted = [...incidents].sort((a, b) => (a.date < b.date ? 1 : -1));
+    if (!sorted.length) {
+      body.innerHTML = '<tr><td colspan="8" class="ar-empty">No incidents logged yet.</td></tr>';
+    } else {
+      body.innerHTML = sorted.map(inc => {
+        const emp = employees.find(e => e.id === inc.employeeId);
+        const result = incidentResult(inc);
+        const impacts = [inc.business && "Business", inc.process && "Process", inc.team && "Team"].filter(Boolean).join(", ") || "—";
+        const resultClass = result > 0 ? "ar-delta-pos" : (result < 0 ? "ar-delta-neg" : "ar-delta-zero");
+        return `<tr>
+          <td><span class="ar-incident-id">${escapeHtml(inc.incidentId || "—")}</span></td>
+          <td class="ar-id">${inc.date}</td>
+          <td class="ar-name">${emp ? escapeHtml(emp.name) : "Unknown"}</td>
+          <td class="ar-desc-cell">${escapeHtml(inc.description)}${inc.instanceCount >= 2 && inc.effect === "NEGATIVE" ? ' <span class="ar-id">(instance ' + inc.instanceCount + ', doubled)</span>' : ""}</td>
+          <td><span class="ar-pill ${inc.effect === 'NEGATIVE' ? 'AT-RISK' : 'GOOD'}">${inc.effect}</span></td>
+          <td class="ar-id">${impacts}</td>
+          <td class="${resultClass}">${pctSigned(result)}</td>
+          <td><button class="ar-btn small secondary" data-delete-incident="${inc.id}">Remove</button></td>
+        </tr>`;
+      }).join("");
+    }
+    document.getElementById("ar-log-stats").innerHTML = `<span><b>${incidents.length}</b> total incidents</span>`;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function renderAll() { renderSummary(); renderLog(); }
+
+  function switchTab(name) {
+    document.querySelectorAll(".ar-tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
+    document.querySelectorAll(".ar-panel").forEach(p => p.classList.toggle("active", p.id === "panel-" + name));
+  }
+
+  function downloadCsv(filename, rows) {
+    const csv = rows.map(r => r.map(v => {
+      const s = String(v ?? "");
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function openIncidentForm() {
+    const overlay = document.createElement("div");
+    overlay.className = "ar-form-overlay";
+    overlay.innerHTML = `
+      <div class="ar-form-card">
+        <h3>Log an incident</h3>
+        <p class="ar-form-sub">Deduction is calculated automatically from the rules below.</p>
+        <div class="ar-field">
+          <label>Incident ID</label>
+          <input type="text" id="f-incident-id" placeholder="e.g. INC-0018">
+          <div class="ar-field-error" id="f-incident-id-error">This Incident ID is required and must be unique.</div>
+        </div>
+        <div class="ar-field">
+          <label>Employee</label>
+          <select id="f-employee">${employees.map(e => `<option value="${e.id}">${escapeHtml(e.name)} — ${escapeHtml(e.empId)}</option>`).join("")}</select>
+        </div>
+        <div class="ar-row2">
+          <div class="ar-field">
+            <label>Date</label>
+            <input type="date" id="f-date" value="${new Date().toISOString().slice(0,10)}">
+          </div>
+          <div class="ar-field">
+            <label>Instance count</label>
+            <input type="number" id="f-instances" min="1" value="1">
+          </div>
+        </div>
+        <div class="ar-field">
+          <label>Description</label>
+          <textarea id="f-description" placeholder="What happened?"></textarea>
+        </div>
+        <div class="ar-field">
+          <label>Effect</label>
+          <div class="ar-effect-toggle">
+            <button type="button" class="on NEGATIVE" data-effect="NEGATIVE">Negative</button>
+            <button type="button" data-effect="POSITIVE">Positive</button>
+          </div>
+        </div>
+        <div class="ar-field">
+          <label>Impact level(s)</label>
+          <div class="ar-impact-group">
+            <label><input type="checkbox" id="f-business"> Business (1.00%)</label>
+            <label><input type="checkbox" id="f-process"> Process (0.50%)</label>
+            <label><input type="checkbox" id="f-team"> Team (0.25%)</label>
+          </div>
+        </div>
+        <div class="ar-live-calc" id="f-live-calc">Select an impact level to see the deduction.</div>
+        <div class="ar-form-actions">
+          <button class="ar-btn secondary" id="f-cancel">Cancel</button>
+          <button class="ar-btn" id="f-save">Log incident</button>
+        </div>
+      </div>`;
+    document.getElementById("appraisal-root").appendChild(overlay);
+
+    let effect = "NEGATIVE";
+    overlay.querySelectorAll("[data-effect]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        effect = btn.dataset.effect;
+        overlay.querySelectorAll("[data-effect]").forEach(b => b.classList.remove("on", "NEGATIVE", "POSITIVE"));
+        btn.classList.add("on", effect);
+        updateLiveCalc();
+      });
+    });
+    ["f-business", "f-process", "f-team", "f-instances"].forEach(id =>
+      overlay.querySelector("#" + id).addEventListener("input", updateLiveCalc)
+    );
+    function updateLiveCalc() {
+      const draft = {
+        effect,
+        instanceCount: Number(overlay.querySelector("#f-instances").value) || 1,
+        business: overlay.querySelector("#f-business").checked,
+        process: overlay.querySelector("#f-process").checked,
+        team: overlay.querySelector("#f-team").checked
+      };
+      const result = incidentResult(draft);
+      const calc = overlay.querySelector("#f-live-calc");
+      if (!draft.business && !draft.process && !draft.team) {
+        calc.textContent = "Select an impact level to see the deduction.";
+      } else {
+        calc.innerHTML = `Deduction: <b style="color:${result < 0 ? 'var(--risk)' : 'var(--good)'}">${pctSigned(result)}</b>` +
+          (draft.effect === "NEGATIVE" && draft.instanceCount >= 2 ? " (doubled — 2+ instances)" : "");
+      }
+    }
+
+    overlay.querySelector("#f-cancel").addEventListener("click", () => overlay.remove());
+    overlay.querySelector("#f-incident-id").addEventListener("input", () => {
+      overlay.querySelector("#f-incident-id").classList.remove("ar-invalid");
+      overlay.querySelector("#f-incident-id-error").classList.remove("show");
+    });
+    overlay.querySelector("#f-save").addEventListener("click", async () => {
+      const incidentIdInput = overlay.querySelector("#f-incident-id");
+      const incidentIdError = overlay.querySelector("#f-incident-id-error");
+      const incidentId = incidentIdInput.value.trim();
+      const isDuplicate = incidents.some(i => (i.incidentId || "").toLowerCase() === incidentId.toLowerCase());
+      if (!incidentId || isDuplicate) {
+        incidentIdInput.classList.add("ar-invalid");
+        incidentIdError.textContent = !incidentId
+          ? "Incident ID is required."
+          : "This Incident ID already exists — please enter a unique one.";
+        incidentIdError.classList.add("show");
+        incidentIdInput.focus();
+        return;
+      }
+      const description = overlay.querySelector("#f-description").value.trim();
+      if (!description) { overlay.querySelector("#f-description").focus(); return; }
+      const inc = {
+        id: "inc_" + Date.now(),
+        incidentId,
+        employeeId: overlay.querySelector("#f-employee").value,
+        date: overlay.querySelector("#f-date").value,
+        description,
+        effect,
+        instanceCount: Number(overlay.querySelector("#f-instances").value) || 1,
+        business: overlay.querySelector("#f-business").checked,
+        process: overlay.querySelector("#f-process").checked,
+        team: overlay.querySelector("#f-team").checked
+      };
+      incidents.push(inc);
+      overlay.remove();
+      renderAll();
+      await saveIncidents();
+    });
+  }
+
+  function openEmployeeForm() {
+    const overlay = document.createElement("div");
+    overlay.className = "ar-form-overlay";
+    overlay.innerHTML = `
+      <div class="ar-form-card" style="width:380px;">
+        <h3>Add employee</h3>
+        <p class="ar-form-sub">Starts at the 8% base rating with no incidents.</p>
+        <div class="ar-field"><label>Full name</label><input type="text" id="e-name"></div>
+        <div class="ar-field"><label>Employee ID</label><input type="text" id="e-id" placeholder="IBS-000"></div>
+        <div class="ar-field">
+          <label>Reporting Manager</label>
+          <input type="text" id="e-manager" placeholder="Manager's full name">
+          <div class="ar-field-error" id="e-manager-error">Reporting Manager is required.</div>
+        </div>
+        <div class="ar-form-actions">
+          <button class="ar-btn secondary" id="e-cancel">Cancel</button>
+          <button class="ar-btn" id="e-save">Add employee</button>
+        </div>
+      </div>`;
+    document.getElementById("appraisal-root").appendChild(overlay);
+    overlay.querySelector("#e-cancel").addEventListener("click", () => overlay.remove());
+    overlay.querySelector("#e-manager").addEventListener("input", () => {
+      overlay.querySelector("#e-manager").classList.remove("ar-invalid");
+      overlay.querySelector("#e-manager-error").classList.remove("show");
+    });
+    overlay.querySelector("#e-save").addEventListener("click", async () => {
+      const name = overlay.querySelector("#e-name").value.trim();
+      const empId = overlay.querySelector("#e-id").value.trim();
+      const managerInput = overlay.querySelector("#e-manager");
+      const managerError = overlay.querySelector("#e-manager-error");
+      const reportingManager = managerInput.value.trim();
+      if (!name) { overlay.querySelector("#e-name").focus(); return; }
+      if (!reportingManager) {
+        managerInput.classList.add("ar-invalid");
+        managerError.classList.add("show");
+        managerInput.focus();
+        return;
+      }
+      employees.push({ id: "emp_" + Date.now(), name, empId: empId || "—", reportingManager });
+      overlay.remove();
+      renderAll();
+      await saveEmployees();
+    });
+  }
+
+  async function init() {
+    await loadData();
+    document.getElementById("ar-loading").style.display = "none";
+    document.getElementById("ar-app").style.display = "block";
+    renderAll();
+
+    document.querySelectorAll(".ar-tab").forEach(t => t.addEventListener("click", () => switchTab(t.dataset.tab)));
+    document.getElementById("btn-add-incident").addEventListener("click", openIncidentForm);
+    document.getElementById("btn-add-employee").addEventListener("click", openEmployeeForm);
+
+    document.getElementById("btn-export-summary").addEventListener("click", () => {
+      const rows = [["Employee", "Employee ID", "Reporting Manager", "Base Rating", "Deduction/Addition", "Final Rating", "# Incidents", "Status"]];
+      employees.forEach(emp => {
+        const s = employeeSummary(emp);
+        rows.push([emp.name, emp.empId, emp.reportingManager || "", "8.00%", pctSigned(s.deduction), pct(s.final), s.count, s.status]);
+      });
+      downloadCsv("appraisal_summary.csv", rows);
+    });
+    document.getElementById("btn-export-log").addEventListener("click", () => {
+      const rows = [["Incident ID", "Date", "Employee", "Employee ID", "Description", "Effect", "Instance Count", "Business", "Process", "Team", "Result"]];
+      [...incidents].sort((a, b) => a.date < b.date ? -1 : 1).forEach(inc => {
+        const emp = employees.find(e => e.id === inc.employeeId);
+        rows.push([inc.incidentId || "", inc.date, emp ? emp.name : "Unknown", emp ? emp.empId : "", inc.description, inc.effect, inc.instanceCount,
+          inc.business ? "YES" : "NO", inc.process ? "YES" : "NO", inc.team ? "YES" : "NO", pctSigned(incidentResult(inc))]);
+      });
+      downloadCsv("appraisal_incident_log.csv", rows);
+    });
+
+    document.getElementById("ar-log-body").addEventListener("click", async (e) => {
+      const id = e.target.dataset.deleteIncident;
+      if (!id) return;
+      if (!confirm("Remove this incident? This will recalculate the employee's rating.")) return;
+      incidents = incidents.filter(i => i.id !== id);
+      renderAll();
+      await saveIncidents();
+    });
+
+    document.getElementById("ar-summary-body").addEventListener("click", async (e) => {
+      const id = e.target.dataset.deleteEmployee;
+      if (!id) return;
+      const emp = employees.find(x => x.id === id);
+      const linkedCount = incidents.filter(i => i.employeeId === id).length;
+      const msg = linkedCount
+        ? `Delete ${emp ? emp.name : "this employee"}? This will also remove their ${linkedCount} logged incident(s).`
+        : `Delete ${emp ? emp.name : "this employee"}?`;
+      if (!confirm(msg)) return;
+      employees = employees.filter(x => x.id !== id);
+      incidents = incidents.filter(i => i.employeeId !== id);
+      renderAll();
+      await saveEmployees();
+      await saveIncidents();
+    });
+  }
+
+  init();
+})();
+</script>
