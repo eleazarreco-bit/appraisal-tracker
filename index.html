@@ -191,6 +191,55 @@
   table.ar-table tr:last-child td { border-bottom: none; }
   table.ar-table tr:hover td { background: #f0f5fc; }
 
+  th.ar-th-sortable {
+    cursor: pointer;
+    user-select: none;
+  }
+  th.ar-th-sortable:hover { background: linear-gradient(120deg, var(--accent-dark), #0f5aad); }
+  .ar-th-inner { display: flex; align-items: center; gap: 5px; }
+  .ar-sort-arrow {
+    font-size: 9px;
+    opacity: 0.45;
+    line-height: 1;
+  }
+  th.ar-th-sortable.sorted-asc .ar-sort-arrow,
+  th.ar-th-sortable.sorted-desc .ar-sort-arrow {
+    opacity: 1;
+    color: var(--accent-2);
+  }
+
+  tr.ar-filter-row td {
+    padding: 6px 12px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+  }
+  .ar-filter-input {
+    width: 100%;
+    box-sizing: border-box;
+    font-family: var(--body);
+    font-size: 12px;
+    padding: 5px 8px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: #ffffff;
+    color: var(--ink);
+  }
+  .ar-filter-input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  select.ar-filter-input { cursor: pointer; }
+  .ar-filter-clear {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+    white-space: nowrap;
+  }
+
   .ar-name { font-weight: 600; }
   .ar-id { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
   .ar-incident-id {
@@ -426,15 +475,16 @@
       <table class="ar-table">
         <thead>
           <tr>
-            <th>Employee</th>
-            <th>ID</th>
-            <th>Reporting Manager</th>
-            <th>Deduction / addition</th>
-            <th>Final rating</th>
-            <th># Incidents</th>
-            <th>Status</th>
+            <th class="ar-th-sortable" data-col="name"><div class="ar-th-inner">Employee <span class="ar-sort-arrow">▲▼</span></div></th>
+            <th class="ar-th-sortable" data-col="empId"><div class="ar-th-inner">ID <span class="ar-sort-arrow">▲▼</span></div></th>
+            <th class="ar-th-sortable" data-col="reportingManager"><div class="ar-th-inner">Reporting Manager <span class="ar-sort-arrow">▲▼</span></div></th>
+            <th class="ar-th-sortable" data-col="deduction"><div class="ar-th-inner">Deduction / addition <span class="ar-sort-arrow">▲▼</span></div></th>
+            <th class="ar-th-sortable" data-col="final"><div class="ar-th-inner">Final rating <span class="ar-sort-arrow">▲▼</span></div></th>
+            <th class="ar-th-sortable" data-col="count"><div class="ar-th-inner"># Incidents <span class="ar-sort-arrow">▲▼</span></div></th>
+            <th class="ar-th-sortable" data-col="status"><div class="ar-th-inner">Status <span class="ar-sort-arrow">▲▼</span></div></th>
             <th></th>
           </tr>
+          <tr class="ar-filter-row" id="ar-summary-filter-row"></tr>
         </thead>
         <tbody id="ar-summary-body"></tbody>
       </table>
@@ -453,15 +503,16 @@
       <table class="ar-table">
         <thead>
           <tr>
-            <th>Incident ID</th>
-            <th>Date</th>
-            <th>Employee</th>
-            <th>Description</th>
-            <th>Effect</th>
-            <th>Impact</th>
-            <th>Result</th>
+            <th class="ar-th-sortable" data-col="incidentId"><div class="ar-th-inner">Incident ID <span class="ar-sort-arrow">▲▼</span></div></th>
+            <th class="ar-th-sortable" data-col="date"><div class="ar-th-inner">Date <span class="ar-sort-arrow">▲▼</span></div></th>
+            <th class="ar-th-sortable" data-col="empName"><div class="ar-th-inner">Employee <span class="ar-sort-arrow">▲▼</span></div></th>
+            <th class="ar-th-sortable" data-col="description"><div class="ar-th-inner">Description <span class="ar-sort-arrow">▲▼</span></div></th>
+            <th class="ar-th-sortable" data-col="effect"><div class="ar-th-inner">Effect <span class="ar-sort-arrow">▲▼</span></div></th>
+            <th class="ar-th-sortable" data-col="impacts"><div class="ar-th-inner">Impact <span class="ar-sort-arrow">▲▼</span></div></th>
+            <th class="ar-th-sortable" data-col="result"><div class="ar-th-inner">Result <span class="ar-sort-arrow">▲▼</span></div></th>
             <th></th>
           </tr>
+          <tr class="ar-filter-row" id="ar-log-filter-row"></tr>
         </thead>
         <tbody id="ar-log-body"></tbody>
       </table>
@@ -548,11 +599,20 @@
   let employees = [];
   let incidents = [];
 
-  const API_BASE = "/api/appraisal-data";
+  let summarySort = { col: null, dir: 1 };
+  let summaryFilters = {};
+  let logSort = { col: "date", dir: -1 };
+  let logFilters = {};
+
+
+  const API_BASE = "/.netlify/functions/appraisal-data";
 
   async function apiGet(key) {
     const res = await fetch(`${API_BASE}?key=${encodeURIComponent(key)}`);
-    if (!res.ok) throw new Error("GET " + key + " failed: " + res.status);
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`GET ${key} failed: ${res.status} ${text}`);
+    }
     const data = await res.json();
     return data.value;
   }
@@ -563,16 +623,19 @@
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ value })
     });
-    if (!res.ok) throw new Error("POST " + key + " failed: " + res.status);
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`POST ${key} failed: ${res.status} ${text}`);
+    }
   }
 
   async function saveEmployees() {
     try { await apiSet("employees", employees); }
-    catch (err) { console.error("save employees failed", err); alert("Could not save — check your connection and try again."); }
+    catch (err) { console.error("save employees failed", err); alert("Could not save employees — " + err.message); }
   }
   async function saveIncidents() {
     try { await apiSet("incidents", incidents); }
-    catch (err) { console.error("save incidents failed", err); alert("Could not save — check your connection and try again."); }
+    catch (err) { console.error("save incidents failed", err); alert("Could not save incidents — " + err.message); }
   }
 
   async function loadData() {
@@ -636,13 +699,107 @@
     return { "OUTSTANDING": "var(--outstanding)", "GOOD": "var(--good)", "NEEDS IMPROVEMENT": "var(--needs)", "AT RISK": "var(--risk)" }[status];
   }
 
+  function getSummaryColumns() {
+    return [
+      { key: "name", type: "text", get: r => r.emp.name },
+      { key: "empId", type: "text", get: r => r.emp.empId },
+      { key: "reportingManager", type: "text", get: r => r.emp.reportingManager || "" },
+      { key: "deduction", type: "number", get: r => r.s.deduction, text: r => pctSigned(r.s.deduction) },
+      { key: "final", type: "number", get: r => r.s.final, text: r => pct(r.s.final) },
+      { key: "count", type: "number", get: r => r.s.count, text: r => String(r.s.count) },
+      { key: "status", type: "select", get: r => r.s.status, options: ["OUTSTANDING", "GOOD", "NEEDS IMPROVEMENT", "AT RISK"] }
+    ];
+  }
+
+  function getLogColumns() {
+    return [
+      { key: "incidentId", type: "text", get: r => r.inc.incidentId || "" },
+      { key: "date", type: "text", get: r => r.inc.date || "" },
+      { key: "empName", type: "text", get: r => r.empName },
+      { key: "description", type: "text", get: r => r.inc.description || "" },
+      { key: "effect", type: "select", get: r => r.inc.effect, options: ["NEGATIVE", "POSITIVE"] },
+      { key: "impacts", type: "text", get: r => r.impacts },
+      { key: "result", type: "number", get: r => r.result, text: r => pctSigned(r.result) }
+    ];
+  }
+
+  function matchesFilters(row, columns, filters) {
+    return columns.every(col => {
+      const f = filters[col.key];
+      if (f === undefined || f === "") return true;
+      if (col.type === "select") return col.get(row) === f;
+      const text = (col.text ? col.text(row) : String(col.get(row) ?? "")).toLowerCase();
+      return text.includes(String(f).toLowerCase());
+    });
+  }
+
+  function applySort(rows, columns, sortState) {
+    if (!sortState.col) return rows;
+    const col = columns.find(c => c.key === sortState.col);
+    if (!col) return rows;
+    const sorted = [...rows].sort((a, b) => {
+      let av = col.get(a), bv = col.get(b);
+      if (typeof av === "string" || typeof bv === "string") {
+        av = String(av ?? "").toLowerCase();
+        bv = String(bv ?? "").toLowerCase();
+      }
+      if (av < bv) return -1;
+      if (av > bv) return 1;
+      return 0;
+    });
+    if (sortState.dir === -1) sorted.reverse();
+    return sorted;
+  }
+
+  function updateSortArrows(theadSelector, columns, sortState) {
+    document.querySelectorAll(theadSelector + " th.ar-th-sortable").forEach(th => {
+      const key = th.dataset.col;
+      const arrow = th.querySelector(".ar-sort-arrow");
+      th.classList.remove("sorted-asc", "sorted-desc");
+      if (key === sortState.col) {
+        arrow.textContent = sortState.dir === 1 ? "▲" : "▼";
+        th.classList.add(sortState.dir === 1 ? "sorted-asc" : "sorted-desc");
+      } else {
+        arrow.textContent = "⇅";
+      }
+    });
+  }
+
+  function buildFilterRow(rowEl, columns, filters, onChange) {
+    rowEl.innerHTML = columns.map(col => {
+      if (col.type === "select") {
+        return `<td><select class="ar-filter-input" data-filter-col="${col.key}">` +
+          `<option value="">All</option>` +
+          col.options.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("") +
+          `</select></td>`;
+      }
+      return `<td><input type="text" class="ar-filter-input" data-filter-col="${col.key}" placeholder="Filter…"></td>`;
+    }).join("") + `<td><button type="button" class="ar-filter-clear" data-clear-filters>Clear</button></td>`;
+
+    rowEl.querySelectorAll("[data-filter-col]").forEach(el => {
+      el.addEventListener("input", () => {
+        filters[el.dataset.filterCol] = el.value;
+        onChange();
+      });
+    });
+    rowEl.querySelector("[data-clear-filters]").addEventListener("click", () => {
+      Object.keys(filters).forEach(k => delete filters[k]);
+      rowEl.querySelectorAll("[data-filter-col]").forEach(el => { el.value = ""; });
+      onChange();
+    });
+  }
+
   function renderSummary() {
     const body = document.getElementById("ar-summary-body");
-    if (!employees.length) {
-      body.innerHTML = '<tr><td colspan="8" class="ar-empty">No employees yet. Add one to get started.</td></tr>';
+    const columns = getSummaryColumns();
+    const allRows = employees.map(emp => ({ emp, s: employeeSummary(emp) }));
+    const filtered = allRows.filter(r => matchesFilters(r, columns, summaryFilters));
+    const rows = applySort(filtered, columns, summarySort);
+
+    if (!rows.length) {
+      body.innerHTML = `<tr><td colspan="8" class="ar-empty">${employees.length ? "No employees match the current filters." : "No employees yet. Add one to get started."}</td></tr>`;
     } else {
-      body.innerHTML = employees.map(emp => {
-        const s = employeeSummary(emp);
+      body.innerHTML = rows.map(({ emp, s }) => {
         const deltaClass = s.deduction > 0 ? "ar-delta-pos" : (s.deduction < 0 ? "ar-delta-neg" : "ar-delta-zero");
         const barPct = Math.max(0, Math.min(100, (s.final / 0.12) * 100));
         return `<tr>
@@ -664,24 +821,31 @@
     }
     const atRisk = employees.filter(e => employeeSummary(e).status === "AT RISK").length;
     document.getElementById("ar-summary-stats").innerHTML =
-      `<span><b>${employees.length}</b> employees</span><span><b>${incidents.length}</b> incidents</span><span><b>${atRisk}</b> at risk</span>`;
+      `<span><b>${rows.length}</b> shown</span><span><b>${employees.length}</b> employees</span><span><b>${incidents.length}</b> incidents</span><span><b>${atRisk}</b> at risk</span>`;
+    updateSortArrows("#panel-summary thead", columns, summarySort);
   }
 
   function renderLog() {
     const body = document.getElementById("ar-log-body");
-    const sorted = [...incidents].sort((a, b) => (a.date < b.date ? 1 : -1));
-    if (!sorted.length) {
-      body.innerHTML = '<tr><td colspan="8" class="ar-empty">No incidents logged yet.</td></tr>';
+    const columns = getLogColumns();
+    const allRows = incidents.map(inc => {
+      const emp = employees.find(e => e.id === inc.employeeId);
+      const result = incidentResult(inc);
+      const impacts = [inc.business && "Business", inc.process && "Process", inc.team && "Team"].filter(Boolean).join(", ") || "—";
+      return { inc, empName: emp ? emp.name : "Unknown", result, impacts };
+    });
+    const filtered = allRows.filter(r => matchesFilters(r, columns, logFilters));
+    const rows = applySort(filtered, columns, logSort);
+
+    if (!rows.length) {
+      body.innerHTML = `<tr><td colspan="8" class="ar-empty">${incidents.length ? "No incidents match the current filters." : "No incidents logged yet."}</td></tr>`;
     } else {
-      body.innerHTML = sorted.map(inc => {
-        const emp = employees.find(e => e.id === inc.employeeId);
-        const result = incidentResult(inc);
-        const impacts = [inc.business && "Business", inc.process && "Process", inc.team && "Team"].filter(Boolean).join(", ") || "—";
+      body.innerHTML = rows.map(({ inc, empName, result, impacts }) => {
         const resultClass = result > 0 ? "ar-delta-pos" : (result < 0 ? "ar-delta-neg" : "ar-delta-zero");
         return `<tr>
           <td><span class="ar-incident-id">${escapeHtml(inc.incidentId || "—")}</span></td>
           <td class="ar-id">${inc.date}</td>
-          <td class="ar-name">${emp ? escapeHtml(emp.name) : "Unknown"}</td>
+          <td class="ar-name">${escapeHtml(empName)}</td>
           <td class="ar-desc-cell">${escapeHtml(inc.description)}${inc.instanceCount >= 2 && inc.effect === "NEGATIVE" ? ' <span class="ar-id">(instance ' + inc.instanceCount + ', doubled)</span>' : ""}</td>
           <td><span class="ar-pill ${inc.effect === 'NEGATIVE' ? 'AT-RISK' : 'GOOD'}">${inc.effect}</span></td>
           <td class="ar-id">${impacts}</td>
@@ -690,8 +854,10 @@
         </tr>`;
       }).join("");
     }
-    document.getElementById("ar-log-stats").innerHTML = `<span><b>${incidents.length}</b> total incidents</span>`;
+    document.getElementById("ar-log-stats").innerHTML = `<span><b>${rows.length}</b> shown</span><span><b>${incidents.length}</b> total incidents</span>`;
+    updateSortArrows("#panel-log thead", columns, logSort);
   }
+
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -893,6 +1059,25 @@
     document.querySelectorAll(".ar-tab").forEach(t => t.addEventListener("click", () => switchTab(t.dataset.tab)));
     document.getElementById("btn-add-incident").addEventListener("click", openIncidentForm);
     document.getElementById("btn-add-employee").addEventListener("click", openEmployeeForm);
+
+    document.querySelectorAll("#panel-summary thead th.ar-th-sortable").forEach(th => {
+      th.addEventListener("click", () => {
+        const col = th.dataset.col;
+        if (summarySort.col === col) summarySort.dir = summarySort.dir === 1 ? -1 : 1;
+        else { summarySort.col = col; summarySort.dir = 1; }
+        renderSummary();
+      });
+    });
+    document.querySelectorAll("#panel-log thead th.ar-th-sortable").forEach(th => {
+      th.addEventListener("click", () => {
+        const col = th.dataset.col;
+        if (logSort.col === col) logSort.dir = logSort.dir === 1 ? -1 : 1;
+        else { logSort.col = col; logSort.dir = 1; }
+        renderLog();
+      });
+    });
+    buildFilterRow(document.getElementById("ar-summary-filter-row"), getSummaryColumns(), summaryFilters, renderSummary);
+    buildFilterRow(document.getElementById("ar-log-filter-row"), getLogColumns(), logFilters, renderLog);
 
     document.getElementById("btn-export-summary").addEventListener("click", () => {
       const rows = [["Employee", "Employee ID", "Reporting Manager", "Base Rating", "Deduction/Addition", "Final Rating", "# Incidents", "Status"]];
