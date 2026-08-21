@@ -548,11 +548,14 @@
   let employees = [];
   let incidents = [];
 
-  const API_BASE = "/api/appraisal-data";
+  const API_BASE = "/.netlify/functions/appraisal-data";
 
   async function apiGet(key) {
     const res = await fetch(`${API_BASE}?key=${encodeURIComponent(key)}`);
-    if (!res.ok) throw new Error("GET " + key + " failed: " + res.status);
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`GET ${key} failed: ${res.status} ${text}`);
+    }
     const data = await res.json();
     return data.value;
   }
@@ -563,16 +566,19 @@
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ value })
     });
-    if (!res.ok) throw new Error("POST " + key + " failed: " + res.status);
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`POST ${key} failed: ${res.status} ${text}`);
+    }
   }
 
   async function saveEmployees() {
     try { await apiSet("employees", employees); }
-    catch (err) { console.error("save employees failed", err); alert("Could not save — check your connection and try again."); }
+    catch (err) { console.error("save employees failed", err); alert("Could not save employees — " + err.message); }
   }
   async function saveIncidents() {
     try { await apiSet("incidents", incidents); }
-    catch (err) { console.error("save incidents failed", err); alert("Could not save — check your connection and try again."); }
+    catch (err) { console.error("save incidents failed", err); alert("Could not save incidents — " + err.message); }
   }
 
   async function loadData() {
