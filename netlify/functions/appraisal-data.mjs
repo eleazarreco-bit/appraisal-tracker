@@ -167,7 +167,7 @@ const CAT = {
   employee_added: "employee", employee_removed: "employee", employee_modified: "employee",
   pin_created: "pin", pin_reset: "pin", pin_removed: "pin",
   lead_added: "access", lead_removed: "access", employee_access_on: "access", employee_access_off: "access",
-  data_read: "view", export: "export"
+  removal_denied: "incident", data_read: "view", export: "export"
 };
 async function audit(store, actor, action, detail, ip) {
   try {
@@ -470,6 +470,28 @@ export function createHandler(getStoreFn) {
       const before = key === "access" ? await getAccess(store)
         : key === "employees" ? roster
         : (await store.get("incidents", { type: "json" })) || [];
+      /* Only Master may remove incidents. Enforced here, on the server, so it holds even if
+         someone bypasses the page and calls this endpoint directly. Removing an employee is
+         also refused for non-Master when that employee has incidents, because that would
+         make their incidents disappear. */
+      if (session.role !== "master") {
+        let blocked = "";
+        if (key === "incidents") {
+          const removed = diffById(before, value, INC_FIELDS).removed;
+          if (removed.length) blocked = "Only Master can remove incidents. If you did not remove one, reload the page: your view may be out of date.";
+          var attempted = removed.map((i) => "Blocked attempt to remove " + describeIncident(i, roster));
+        } else if (key === "employees") {
+          const removedEmps = diffById(before, value, EMP_FIELDS).removed;
+          const stored = (await store.get("incidents", { type: "json" })) || [];
+          const withInc = removedEmps.filter((e) => stored.some((i) => i.employeeId === e.id));
+          if (withInc.length) blocked = "Only Master can delete an employee who has incidents logged.";
+          var attempted = withInc.map((e) => "Blocked attempt to delete " + empLabel(roster, e.id) + " who has logged incidents");
+        }
+        if (blocked) {
+          await auditMany(store, actor, ip, (attempted || []).map((d) => ({ action: "removal_denied", detail: d })));
+          return json(403, { error: blocked });
+        }
+      }
       await store.setJSON(key, value);
       const events = key === "access" ? diffAccess(before, value, roster)
         : key === "employees" ? diffEmployees(before, value)
