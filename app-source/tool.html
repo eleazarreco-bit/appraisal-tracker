@@ -599,7 +599,7 @@
     <div class="ar-panel" id="panel-settings">
       <div class="ar-rule-card" style="margin-bottom:14px;">
         <h4>Lead access — phone numbers</h4>
-        <p>Anyone listed here can get past the entry page with their phone number <b>and their personal PIN</b>, and gets the full tool (add employees, log and remove incidents). A new lead gets a PIN automatically — pass it to them privately. Only Master sees this Settings tab.</p>
+        <p>Anyone listed here can get past the entry page with their phone number <b>and their personal PIN</b>, and gets the full tool (add employees and log incidents; only Master can remove incidents). A new lead gets a PIN automatically — pass it to them privately. Only Master sees this Settings tab.</p>
       </div>
       <div class="ar-set-form">
         <input type="text" class="ar-filter-input" id="set-lead-name" placeholder="Lead's name">
@@ -700,7 +700,7 @@
   async function saveIncidents() {
     if (!CAN_EDIT) return;
     try { await apiSet("incidents", incidents); }
-    catch (err) { console.error("save incidents failed", err); alert("Could not save incidents — " + err.message); }
+    catch (err) { console.error("save incidents failed", err); alert("Could not save incidents — " + err.message); try { incidents = await apiGet("incidents"); renderAll(); } catch (e) {} }
   }
 
   function normalizeAccess(a) {
@@ -907,7 +907,7 @@
           </td>
           <td>${s.count}</td>
           <td><span class="ar-pill ${statusClass(s.status)}">${s.status}</span></td>
-          <td>${CAN_EDIT ? `<button class="ar-btn small danger" data-delete-employee="${emp.id}">Delete</button>` : ""}</td>
+          <td>${(IS_MASTER || (CAN_EDIT && !incidents.some(i => i.employeeId === emp.id))) ? `<button class="ar-btn small danger" data-delete-employee="${emp.id}">Delete</button>` : ""}</td>
         </tr>`;
       }).join("");
     }
@@ -943,7 +943,7 @@
           <td><span class="ar-pill ${inc.effect === 'NEGATIVE' ? 'AT-RISK' : 'GOOD'}">${inc.effect}</span></td>
           <td class="ar-id">${impacts}</td>
           <td class="${resultClass}">${pctSigned(result)}</td>
-          <td>${CAN_EDIT ? `<button class="ar-btn small secondary" data-delete-incident="${inc.id}">Remove</button>` : ""}</td>
+          <td>${IS_MASTER ? `<button class="ar-btn small secondary" data-delete-incident="${inc.id}">Remove</button>` : ""}</td>
         </tr>`;
       }).join("");
     }
@@ -1292,7 +1292,7 @@
   /* ------------------------------ activity log (Master) ------------------------------ */
   const ACT = {
     login_ok: ["Signed in", "GOOD"], login_fail: ["Sign-in failed", "AT-RISK"], login_locked: ["Locked out", "AT-RISK"], session_open: ["Opened tool", "NEUTRAL"],
-    incident_added: ["Incident added", "GOOD"], incident_removed: ["Incident removed", "AT-RISK"], incident_modified: ["Incident modified", "NEEDS-IMPROVEMENT"],
+    incident_added: ["Incident added", "GOOD"], incident_removed: ["Incident removed", "AT-RISK"], incident_modified: ["Incident modified", "NEEDS-IMPROVEMENT"], removal_denied: ["Removal blocked", "AT-RISK"],
     employee_added: ["Employee added", "GOOD"], employee_removed: ["Employee removed", "AT-RISK"], employee_modified: ["Employee modified", "NEEDS-IMPROVEMENT"],
     pin_created: ["PIN created", "GOOD"], pin_reset: ["PIN reset", "NEEDS-IMPROVEMENT"], pin_removed: ["PIN removed", "AT-RISK"],
     lead_added: ["Lead added", "GOOD"], lead_removed: ["Lead removed", "AT-RISK"],
@@ -1409,7 +1409,7 @@
 
     document.getElementById("ar-log-body").addEventListener("click", async (e) => {
       const id = e.target.dataset.deleteIncident;
-      if (!id || !CAN_EDIT) return;
+      if (!id || !IS_MASTER) return;
       if (!confirm("Remove this incident? This will recalculate the employee's rating.")) return;
       incidents = incidents.filter(i => i.id !== id);
       renderAll();
@@ -1421,6 +1421,7 @@
       if (!id || !CAN_EDIT) return;
       const emp = employees.find(x => x.id === id);
       const linkedCount = incidents.filter(i => i.employeeId === id).length;
+      if (linkedCount && !IS_MASTER) { alert("Only Master can delete an employee who has incidents logged."); return; }
       const msg = linkedCount
         ? `Delete ${emp ? emp.name : "this employee"}? This will also remove their ${linkedCount} logged incident(s).`
         : `Delete ${emp ? emp.name : "this employee"}?`;
