@@ -278,6 +278,8 @@
   .ar-pill.GOOD { background: var(--good-bg); color: var(--good); }
   .ar-pill.NEEDS-IMPROVEMENT { background: var(--needs-bg); color: var(--needs); }
   .ar-pill.AT-RISK { background: var(--risk-bg); color: var(--risk); }
+  .ar-pill.NEUTRAL { background: #eaf2fc; color: var(--accent); }
+  .ar-act-detail { max-width: 460px; white-space: normal; font-size: 12.5px; color: #3a4457; word-break: break-word; }
 
   .ar-bar-track {
     width: 90px;
@@ -475,6 +477,7 @@
       <button class="ar-tab" data-tab="log">Incident Log</button>
       <button class="ar-tab" data-tab="rules">Rules &amp; Reference</button>
       <button class="ar-tab" data-tab="settings" id="tab-settings" style="display:none;">Settings</button>
+      <button class="ar-tab" data-tab="activity" id="tab-activity" style="display:none;">Activity Log</button>
     </div>
 
     <div class="ar-panel active" id="panel-summary">
@@ -561,10 +564,42 @@
       <p class="ar-footnote">Note: bands are evaluated in order above — a rating below 5% is AT RISK even though it is also below 6%.</p>
     </div>
 
+    <div class="ar-panel" id="panel-activity">
+      <div class="ar-rule-card" style="margin-bottom:14px;">
+        <h4>Activity log</h4>
+        <p>Every sign-in, data view, incident / employee change, PIN and access change, and CSV export is recorded here with who, when and from which IP address. Entries cannot be edited or deleted from this tool. PIN values and passwords are never recorded. Only Master sees this tab.</p>
+      </div>
+      <div class="ar-toolbar">
+        <div class="ar-stats" id="act-stats"></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <select class="ar-filter-input" id="act-cat" style="width:170px;">
+            <option value="">All activity</option>
+            <option value="auth">Sign-ins</option>
+            <option value="incident">Incidents</option>
+            <option value="employee">Employees</option>
+            <option value="pin">PINs</option>
+            <option value="access">Access changes</option>
+            <option value="view">Data views</option>
+            <option value="export">Exports</option>
+          </select>
+          <input type="text" class="ar-filter-input" id="act-search" placeholder="Search who, action, details…" style="width:230px;">
+          <button class="ar-btn small secondary" id="act-refresh">Refresh</button>
+          <button class="ar-btn small secondary" id="act-export">Export CSV</button>
+        </div>
+      </div>
+      <div class="ar-table-scroll">
+        <table class="ar-table">
+          <thead><tr><th>When</th><th>Who</th><th>Action</th><th>Details</th><th>IP</th></tr></thead>
+          <tbody id="act-body"></tbody>
+        </table>
+      </div>
+      <div style="text-align:center; margin-top:12px;"><button class="ar-btn small secondary" id="act-more" style="display:none;">Load older entries</button></div>
+    </div>
+
     <div class="ar-panel" id="panel-settings">
       <div class="ar-rule-card" style="margin-bottom:14px;">
         <h4>Lead access — phone numbers</h4>
-        <p>Anyone listed here can get past the entry page by typing their phone number, and gets the full tool (add employees, log and remove incidents). Only Master sees this Settings tab.</p>
+        <p>Anyone listed here can get past the entry page with their phone number <b>and their personal PIN</b>, and gets the full tool (add employees, log and remove incidents). A new lead gets a PIN automatically — pass it to them privately. Only Master sees this Settings tab.</p>
       </div>
       <div class="ar-set-form">
         <input type="text" class="ar-filter-input" id="set-lead-name" placeholder="Lead's name">
@@ -574,26 +609,27 @@
       <div class="ar-field-error" id="set-lead-error" style="margin-bottom:10px;"></div>
       <div class="ar-table-scroll" style="margin-bottom:28px;">
         <table class="ar-table">
-          <thead><tr><th>Name</th><th>Phone</th><th>Added</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Phone</th><th>Added</th><th>PIN</th><th></th></tr></thead>
           <tbody id="set-leads-body"></tbody>
         </table>
       </div>
 
       <div class="ar-rule-card" style="margin-bottom:14px;">
         <h4>Employee access — Employee ID</h4>
-        <p>Ticked employees can enter their Employee ID on the entry page and see only their own rating, score and incidents — read-only, with no add, edit or delete options. Unticked employees cannot get in.</p>
+        <p>Ticked employees can sign in with their Employee ID <b>and a personal PIN</b> and see only their own rating, score and incidents — read-only, with no add, edit or delete options. Unticked employees, and employees without a PIN, cannot get in. PINs are shown once when created and cannot be looked up later — only reset.</p>
       </div>
       <div class="ar-toolbar">
         <div class="ar-stats" id="set-emp-stats"></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <input type="text" class="ar-filter-input" id="set-emp-search" placeholder="Search name, ID or manager…" style="width:220px;">
+          <button class="ar-btn small" id="set-emp-pins">Create PINs for shown (no PIN yet)</button>
           <button class="ar-btn small secondary" id="set-emp-enable">Enable all shown</button>
           <button class="ar-btn small secondary" id="set-emp-disable">Disable all shown</button>
         </div>
       </div>
       <div class="ar-table-scroll">
         <table class="ar-table">
-          <thead><tr><th>Employee</th><th>ID</th><th>Reporting Manager</th><th>Access</th></tr></thead>
+          <thead><tr><th>Employee</th><th>ID</th><th>Reporting Manager</th><th>Access</th><th>PIN</th></tr></thead>
           <tbody id="set-emp-body"></tbody>
         </table>
       </div>
@@ -670,8 +706,44 @@
   function normalizeAccess(a) {
     return {
       leads: Array.isArray(a && a.leads) ? a.leads : [],
-      enabledEmployees: Array.isArray(a && a.enabledEmployees) ? a.enabledEmployees : []
+      enabledEmployees: Array.isArray(a && a.enabledEmployees) ? a.enabledEmployees : [],
+      pinnedEmployees: Array.isArray(a && a.pinnedEmployees) ? a.pinnedEmployees : []
     };
+  }
+  async function issuePins(kind, ids) {
+    const res = await fetch(`${API_BASE}?action=setpin`, {
+      method: "POST", headers: authHeaders({ "content-type": "application/json" }),
+      body: JSON.stringify({ kind, ids })
+    });
+    if (res.status === 401) { alert("Your session has expired. Please sign in again."); signOut(); throw new Error("session expired"); }
+    if (!res.ok) throw new Error("Could not create PIN(s) — " + res.status);
+    const data = await res.json();
+    access = normalizeAccess(await apiGet("access"));   // refresh the "PIN set" flags
+    renderSettings();
+    return data.pins || [];
+  }
+  function showPins(title, note, rows) {
+    const overlay = document.createElement("div");
+    overlay.className = "ar-form-overlay";
+    overlay.innerHTML = `
+      <div class="ar-form-card">
+        <h3>${escapeHtml(title)}</h3>
+        <p class="ar-form-sub">${escapeHtml(note)}</p>
+        <div class="ar-table-scroll" style="margin-bottom:14px;">
+          <table class="ar-table" style="min-width:0;">
+            <thead><tr><th>Name</th><th>ID / Phone</th><th>PIN</th></tr></thead>
+            <tbody>${rows.map(r => `<tr><td class="ar-name">${escapeHtml(r.name)}</td><td class="ar-id">${escapeHtml(r.sub)}</td><td class="ar-id" style="font-size:15px;font-weight:600;letter-spacing:.12em;">${escapeHtml(r.pin)}</td></tr>`).join("")}</tbody>
+          </table>
+        </div>
+        <div class="ar-form-actions">
+          ${rows.length > 1 ? '<button class="ar-btn secondary" id="pin-csv">Download CSV</button>' : ""}
+          <button class="ar-btn" id="pin-done">I have saved these — close</button>
+        </div>
+      </div>`;
+    document.getElementById("appraisal-root").appendChild(overlay);
+    overlay.querySelector("#pin-done").addEventListener("click", () => overlay.remove());
+    const csv = overlay.querySelector("#pin-csv");
+    if (csv) csv.addEventListener("click", () => { downloadCsv("appraisal_pins.csv", [["Name", "Employee ID / Phone", "PIN"], ...rows.map(r => [r.name, r.sub, r.pin])]); reportExport("pins", rows.length); });
   }
   async function saveAccess() {
     if (!IS_MASTER) return;
@@ -894,11 +966,13 @@
           <td class="ar-name">${escapeHtml(l.name || "—")}</td>
           <td class="ar-id">${escapeHtml(l.phone)}</td>
           <td class="ar-id">${escapeHtml((l.addedAt || "").slice(0, 10))}</td>
-          <td><button class="ar-btn small danger" data-remove-lead="${escapeHtml(l.id)}">Remove</button></td>
+          <td class="ar-id">${l.hasPin ? "Set" : "<b style='color:var(--risk)'>Not set</b>"}</td>
+          <td style="white-space:nowrap;"><button class="ar-btn small secondary" data-pin-lead="${escapeHtml(l.id)}">${l.hasPin ? "Reset PIN" : "Create PIN"}</button> <button class="ar-btn small danger" data-remove-lead="${escapeHtml(l.id)}">Remove</button></td>
         </tr>`).join("")
-      : `<tr><td colspan="4" class="ar-empty">No leads added yet. Only Master can get in until you add a phone number.</td></tr>`;
+      : `<tr><td colspan="5" class="ar-empty">No leads added yet. Only Master can get in until you add a phone number.</td></tr>`;
 
     const enabled = new Set(access.enabledEmployees);
+    const pinned = new Set(access.pinnedEmployees);
     const q = accessSearch.trim().toLowerCase();
     const list = employees.filter(e => !q || (e.name + " " + e.empId + " " + (e.reportingManager || "")).toLowerCase().includes(q));
     document.getElementById("set-emp-body").innerHTML = list.length
@@ -907,8 +981,9 @@
           <td class="ar-id">${escapeHtml(e.empId)}</td>
           <td class="ar-id">${escapeHtml(e.reportingManager || "—")}</td>
           <td><label style="cursor:pointer;"><input type="checkbox" data-access-emp="${escapeHtml(e.id)}" ${enabled.has(e.id) ? "checked" : ""}> Can view own record</label></td>
+          <td style="white-space:nowrap;"><span class="ar-id">${pinned.has(e.id) ? "Set" : "—"}</span> <button class="ar-btn small secondary" data-pin-emp="${escapeHtml(e.id)}">${pinned.has(e.id) ? "Reset" : "Create"}</button></td>
         </tr>`).join("")
-      : `<tr><td colspan="4" class="ar-empty">No employees match.</td></tr>`;
+      : `<tr><td colspan="5" class="ar-empty">No employees match.</td></tr>`;
     updateAccessStats();
   }
   function updateAccessStats() {
@@ -924,6 +999,12 @@
     document.querySelectorAll(".ar-panel").forEach(p => p.classList.toggle("active", p.id === "panel-" + name));
   }
 
+  function reportExport(kind, count) {          // tells the server a CSV was downloaded, so it lands in the activity log
+    try {
+      fetch(`${API_BASE}?action=audit`, { method: "POST", headers: authHeaders({ "content-type": "application/json" }),
+        body: JSON.stringify({ event: "export_" + kind, rows: count }) }).catch(() => {});
+    } catch (e) {}
+  }
   function downloadCsv(filename, rows) {
     const csv = rows.map(r => r.map(v => {
       const s = String(v ?? "");
@@ -1117,6 +1198,7 @@
     if (IS_MASTER) {
       document.getElementById("tab-settings").style.display = "";
       setupSettings();
+      setupActivity();
     }
   }
 
@@ -1137,8 +1219,22 @@
       document.getElementById("set-lead-phone").value = "";
       renderSettings();
       await saveAccess();
+      try {
+        const pins = await issuePins("lead", [access.leads[access.leads.length - 1].id]);
+        if (pins.length) showPins("PIN for new lead", "Give this PIN to the lead privately. It is shown only once — it cannot be looked up later, only reset.", [{ name: name || "Lead", sub: phone, pin: pins[0].pin }]);
+      } catch (err) { alert(err.message); }
     });
     document.getElementById("set-leads-body").addEventListener("click", async (e) => {
+      const pinId = e.target.dataset.pinLead;
+      if (pinId) {
+        const lead = access.leads.find(l => l.id === pinId);
+        if (lead && lead.hasPin && !confirm(`Reset the PIN for ${lead.name || "this lead"}? The old PIN stops working and they are signed out immediately.`)) return;
+        try {
+          const pins = await issuePins("lead", [pinId]);
+          if (pins.length) showPins("New lead PIN", "Give this PIN to the lead privately. It is shown only once.", [{ name: (lead && lead.name) || "Lead", sub: (lead && lead.phone) || "", pin: pins[0].pin }]);
+        } catch (err) { alert(err.message); }
+        return;
+      }
       const id = e.target.dataset.removeLead;
       if (!id) return;
       const lead = access.leads.find(l => l.id === id);
@@ -1146,6 +1242,29 @@
       access.leads = access.leads.filter(l => l.id !== id);
       renderSettings();
       await saveAccess();
+    });
+    document.getElementById("set-emp-body").addEventListener("click", async (e) => {
+      const id = e.target.dataset.pinEmp;
+      if (!id) return;
+      const emp = employees.find(x => x.id === id);
+      if (access.pinnedEmployees.includes(id) && !confirm(`Reset the PIN for ${emp ? emp.name : "this employee"}? The old PIN stops working and any open session ends.`)) return;
+      try {
+        const pins = await issuePins("employee", [id]);
+        if (pins.length) showPins("Employee PIN", "Give this PIN to the employee privately. It is shown only once.", [{ name: emp ? emp.name : "", sub: emp ? emp.empId : "", pin: pins[0].pin }]);
+      } catch (err) { alert(err.message); }
+    });
+    document.getElementById("set-emp-pins").addEventListener("click", async () => {
+      const q = accessSearch.trim().toLowerCase();
+      const pinned = new Set(access.pinnedEmployees);
+      const targets = employees.filter(e => (!q || (e.name + " " + e.empId + " " + (e.reportingManager || "")).toLowerCase().includes(q)) && !pinned.has(e.id));
+      if (!targets.length) { alert("Every employee currently shown already has a PIN."); return; }
+      if (!confirm(`Create PINs for ${targets.length} employee(s)? You will see the list once — download it and hand each PIN out privately.`)) return;
+      try {
+        const pins = await issuePins("employee", targets.map(e => e.id));
+        const byId = new Map(employees.map(e => [e.id, e]));
+        showPins("Employee PINs created", "Shown only once. Download the CSV now and give each person only their own PIN; delete the file afterwards.",
+          pins.map(p => ({ name: (byId.get(p.id) || {}).name || "", sub: (byId.get(p.id) || {}).empId || "", pin: p.pin })));
+      } catch (err) { alert(err.message); }
     });
     document.getElementById("set-emp-body").addEventListener("change", async (e) => {
       const id = e.target.dataset.accessEmp;
@@ -1168,6 +1287,73 @@
     }
     document.getElementById("set-emp-enable").addEventListener("click", () => bulk(true));
     document.getElementById("set-emp-disable").addEventListener("click", () => bulk(false));
+  }
+
+  /* ------------------------------ activity log (Master) ------------------------------ */
+  const ACT = {
+    login_ok: ["Signed in", "GOOD"], login_fail: ["Sign-in failed", "AT-RISK"], login_locked: ["Locked out", "AT-RISK"], session_open: ["Opened tool", "NEUTRAL"],
+    incident_added: ["Incident added", "GOOD"], incident_removed: ["Incident removed", "AT-RISK"], incident_modified: ["Incident modified", "NEEDS-IMPROVEMENT"],
+    employee_added: ["Employee added", "GOOD"], employee_removed: ["Employee removed", "AT-RISK"], employee_modified: ["Employee modified", "NEEDS-IMPROVEMENT"],
+    pin_created: ["PIN created", "GOOD"], pin_reset: ["PIN reset", "NEEDS-IMPROVEMENT"], pin_removed: ["PIN removed", "AT-RISK"],
+    lead_added: ["Lead added", "GOOD"], lead_removed: ["Lead removed", "AT-RISK"],
+    employee_access_on: ["Employee access on", "GOOD"], employee_access_off: ["Employee access off", "NEEDS-IMPROVEMENT"],
+    data_read: ["Data viewed", "NEUTRAL"], export: ["CSV export", "OUTSTANDING"]
+  };
+  let activity = [], activityNext = null, activityRemaining = 0, activityLoaded = false, actCat = "", actSearch = "";
+
+  function whoLabel(a) {
+    const n = a && a.name ? " — " + a.name : "";
+    return { master: "Master", lead: "Lead", employee: "Employee", unknown: "Not signed in" }[a && a.role] ? ({ master: "Master", lead: "Lead", employee: "Employee", unknown: "Not signed in" }[a.role] + (a.role === "master" ? "" : n)) : "Unknown";
+  }
+  function activityRows() {
+    const q = actSearch.trim().toLowerCase();
+    return activity.filter(e => (!actCat || e.cat === actCat) &&
+      (!q || (whoLabel(e.actor) + " " + ((ACT[e.action] || [e.action])[0]) + " " + e.detail + " " + e.ip).toLowerCase().includes(q)));
+  }
+  function renderActivity() {
+    const rows = activityRows();
+    document.getElementById("act-body").innerHTML = rows.length
+      ? rows.map(e => {
+          const [label, cls] = ACT[e.action] || [e.action, "NEUTRAL"];
+          return `<tr>
+            <td class="ar-id" style="white-space:nowrap;">${escapeHtml(new Date(e.ts).toLocaleString())}</td>
+            <td class="ar-name">${escapeHtml(whoLabel(e.actor))}</td>
+            <td><span class="ar-pill ${cls}">${escapeHtml(label)}</span></td>
+            <td class="ar-act-detail">${escapeHtml(e.detail)}</td>
+            <td class="ar-id">${escapeHtml(e.ip || "")}</td>
+          </tr>`;
+        }).join("")
+      : `<tr><td colspan="5" class="ar-empty">${activityLoaded ? "No activity matches the current filters." : "Loading…"}</td></tr>`;
+    document.getElementById("act-stats").innerHTML =
+      `<span><b>${rows.length}</b> shown</span><span><b>${activity.length}</b> loaded</span>` + (activityRemaining ? `<span><b>${activityRemaining}</b> older not loaded</span>` : "");
+    document.getElementById("act-more").style.display = activityNext ? "" : "none";
+  }
+  async function loadActivity(reset) {
+    const btn = document.getElementById("act-more");
+    try {
+      const url = `${API_BASE}?action=log&limit=200` + (!reset && activityNext ? `&before=${encodeURIComponent(activityNext)}` : "");
+      const res = await fetch(url, { headers: authHeaders(), cache: "no-store" });
+      if (res.status === 401) { alert("Your session has expired. Please sign in again."); signOut(); return; }
+      if (!res.ok) throw new Error("Could not load the activity log (" + res.status + ")");
+      const data = await res.json();
+      activity = reset ? data.entries : activity.concat(data.entries);
+      activityNext = data.next; activityRemaining = data.remaining || 0; activityLoaded = true;
+    } catch (err) { alert(err.message); }
+    renderActivity();
+  }
+  function setupActivity() {
+    document.getElementById("tab-activity").style.display = "";
+    document.getElementById("tab-activity").addEventListener("click", () => { if (!activityLoaded) loadActivity(true); });
+    document.getElementById("act-refresh").addEventListener("click", () => loadActivity(true));
+    document.getElementById("act-more").addEventListener("click", () => loadActivity(false));
+    document.getElementById("act-cat").addEventListener("change", (e) => { actCat = e.target.value; renderActivity(); });
+    document.getElementById("act-search").addEventListener("input", (e) => { actSearch = e.target.value; renderActivity(); });
+    document.getElementById("act-export").addEventListener("click", () => {
+      const rows = [["When", "Who", "Role", "Action", "Details", "IP"]];
+      activityRows().forEach(e => rows.push([e.ts, (e.actor && e.actor.name) || "", (e.actor && e.actor.role) || "", (ACT[e.action] || [e.action])[0], e.detail, e.ip || ""]));
+      downloadCsv("appraisal_activity_log.csv", rows);
+      reportExport("activity_log", rows.length - 1);
+    });
   }
 
   async function init() {
@@ -1208,6 +1394,7 @@
         rows.push([emp.name, emp.empId, emp.reportingManager || "", "8.00%", pctSigned(s.deduction), pct(s.final), s.count, s.status]);
       });
       downloadCsv("appraisal_summary.csv", rows);
+      reportExport("summary", rows.length - 1);
     });
     document.getElementById("btn-export-log").addEventListener("click", () => {
       const rows = [["Incident ID", "Date", "Employee", "Employee ID", "Description", "Effect", "Instance Count", "Business", "Process", "Team", "Result"]];
@@ -1217,6 +1404,7 @@
           inc.business ? "YES" : "NO", inc.process ? "YES" : "NO", inc.team ? "YES" : "NO", pctSigned(incidentResult(inc))]);
       });
       downloadCsv("appraisal_incident_log.csv", rows);
+      reportExport("incidents", rows.length - 1);
     });
 
     document.getElementById("ar-log-body").addEventListener("click", async (e) => {
@@ -1240,8 +1428,8 @@
       employees = employees.filter(x => x.id !== id);
       incidents = incidents.filter(i => i.employeeId !== id);
       renderAll();
+      await saveIncidents();      // incidents first, so the log can still name the employee
       await saveEmployees();
-      await saveIncidents();
     });
   }
 
